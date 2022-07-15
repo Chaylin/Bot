@@ -1,0 +1,7 @@
+{"_id":{"$oid":"62542371087773645cb29758"},
+  "player":"Stoffl2108",
+  "village 1":{"id":{"$numberInt":"32616"},"under_attack":false,"send spy":false,"send def":false,"impact":null,"response":[]},
+  "village 2":{"id":{"$numberInt":"32614"},"under_attack":false,"send spy":false,"send def":false,"impact":null,"response":[]},
+  "village 3":{"id":{"$numberInt":"36821"},"under_attack":false,"send spy":false,"send def":false,"impact":null,"response":[]},
+  "village 4":{"id":{"$numberInt":"37071"},"under_attack":false,"send spy":false,"send def":false,"impact":null,"response":[]},
+  "village 5":{"id":{"$numberInt":"37313"},"under_attack":false,"send spy":false,"send def":false,"impact":null,"response":[]}}

@@ -1,0 +1,4 @@
+82&7284&ram&1654119000000&8&false&true&spear=MA==/sword=MA==/axe=MzAwMA==/archer=MA==/spy=MTA=/light=MTUwMA==/marcher=MA==/heavy=MA==/ram=MjUw/catapult=NTA=/knight=MA==/snob=MA==/militia=MA==
+82&7284&ram&1654119000000&11&false&true&spear=MA==/sword=MA==/axe=MzAwMA==/archer=MA==/spy=MTA=/light=MTUwMA==/marcher=MA==/heavy=MA==/ram=MjUw/catapult=NTA=/knight=MA==/snob=MQ==/militia=MA==
+15755&3558&ram&1654119000000&14&false&true&spear=MA==/sword=MA==/axe=MA==/archer=MA==/spy=MTA=/light=MA==/marcher=MA==/heavy=MA==/ram=MA==/catapult=NQ==/knight=MA==/snob=MA==/militia=MA==
+82&7284&ram&1654119000000&45&false&true&spear=MA==/sword=MA==/axe=NTAwMA==/archer=MA==/spy=MTA=/light=MjUwMA==/marcher=MA==/heavy=MA==/ram=MzUw/catapult=NTA=/knight=MA==/snob=MA==/militia=MA==

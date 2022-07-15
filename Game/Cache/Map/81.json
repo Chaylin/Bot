@@ -1,0 +1,24 @@
+{
+  "id": "81",
+  "name": "010",
+  "location": [
+    568,
+    549
+  ],
+  "bonus": null,
+  "points": 9319,
+  "safe": true,
+  "safe for scout": true,
+  "last scout": 1654323639,
+  "last attack": [
+    1
+  ],
+  "last ram": 1,
+  "last extra": 1,
+  "tribe": "206",
+  "owner": "1576421614",
+  "buildings": {},
+  "units": {},
+  "units_away": {},
+  "resources": {}
+}
