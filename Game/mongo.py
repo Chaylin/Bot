@@ -1,8 +1,11 @@
 import pymongo
 from datetime import datetime
+import time
 
 
 class Mongo:
+    logs = None
+
     def __init__(self):
         self.client = pymongo.MongoClient(
             "mongodb+srv://admin:admin@cluster0.kxi86.mongodb.net/Database?retryWrites=true&w=majority")
@@ -10,6 +13,7 @@ class Mongo:
         self.player = self.db.player
         self.own_villages = self.db.own_villages
         self.villages = self.db.villages202
+        self.dblogs = self.db.logs
 
     def find_by_coords(self, x, y):
         query = {"location": [int(x), int(y)]}
@@ -62,6 +66,56 @@ class Mongo:
             data.update(default_temp)
             self.own_villages.insert_one(data)
             return default_temp
+
+    def create_daily_log(self, player):
+        default_log_acc = {
+            'player': player,
+            'time_build': 0,
+            'time_gather': 0,
+            'time_farm': 0,
+            'time_recruit': 0,
+            'time_reports': 0,
+            'time_apm_cap': 0,
+            'time_bot_captcha': 0,
+            'time_scan_map': 0,
+            'count_reports': 0,
+            'count_apm_cap': 0,
+            'count_bot_captcha': 0,
+            'count_scan_map': 0,
+            'count_farm_attacks': 0,
+            'count_scout_attacks': 0,
+            'count_ram_attacks': 0,
+            'count_cata_attacks': 0,
+            'count_gather_send': 0,
+            'count_buildings_build': 0,
+            'count_units_recruit': 0,
+        }
+        self.logs.update({
+            'date': time.today(),
+            f'{player}': default_log_acc
+        })
+        query = {
+            'date': time.today(),
+            'player': player,
+                 }
+        result = self.dblogs.find_one(query)
+        if result:
+            return
+        else:
+            self.dblogs.insert_one(data)
+
+    def synch_log(self, data, player):
+        query = {
+            'date': time.today(),
+            'player': player,
+        }
+        result = self.dblogs.find_one(query)
+        if result:
+            update = {'$set': data}
+            self.dblogs.update_one(query, update)
+        else:
+            self.create_daily_log()
+            self.dblogs.update_one(query, update)
 
 
     def delete_attack(self, command_id):

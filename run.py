@@ -22,6 +22,7 @@ class Bot:
     clear_village = {}
 
     acc_settings = {}
+    logs = {'date': None}
     start_sec = None
     apm = 0
     current_vil = None
@@ -54,11 +55,13 @@ class Bot:
                 print("!!! Bot-Captcha active !!!")
                 time.sleep(10)
                 if self.driver.check_bot_captcha():
+                    start_time = time.time()
                     player = self.config.read_config("game", "account", "username")
                     update = {"status": 'Alert'}
                     self.mongo.synch_player(player, update, None)
                     self.discord.send_message(f" Player[{player}] Bot-Captcha active !")
                     breakpoint()
+                    self.logs[f'{player}']['time_bot-captcha'] += time.time() - start_time
                     # Reset APM values
                     self.driver.actions = 0
                     self.apm = 0
@@ -73,14 +76,18 @@ class Bot:
             self.restart = True
             self.infinity_loop()
 
-
-
     def cycle(self):
         if not self.start_sec:
             now = datetime.now()
             self.start_sec = datetime.timestamp(now)
         while True:
+            player = self.config.read_config("game", "account", "username")
+            self.mongo.create_daily_log(player)
+
+            start_time = time.time()
             self.read_reports()
+            elf.logs[f'{player}']['time_reports'] += time.time() - start_time
+
             for vil in self.villages:
                 if self.current_vil and self.restart:
                     if not self.current_vil == vil.v_id:
@@ -88,6 +95,8 @@ class Bot:
                 print(f"********************************************************\n"
                       f"VILLAGE: [{vil.v_name}]             ID:[{vil.v_id}] \n"
                       f"********************************************************")
+                self.create_log_vil(vil.v_id)
+
                 self.current_vil = vil.v_id
                 self.restart = False
                 self.synch_account()
@@ -105,20 +114,58 @@ class Bot:
                 pausing_random = pausing + random.randint(1, 5)
                 if time_running_sec > 120:
                     if self.apm > int(self.acc_settings["apm_cap"]):
+                        start_time = time.time()
                         print(f"Pausing {pausing_random} seconds ... \n"
                               f"because {round(self.apm)} actions per minute, apm_cap = [{self.acc_settings['apm_cap']}]")
                         time.sleep(pausing_random)
+                        self.logs[f'{player}']['time_apm_cap'] += time.time() - start_time
                 # ######################
 
                 if self.acc_settings["build"]:
+                    start_time = time.time()
                     vil.build()
+                    self.logs[f'{vil.v_id}']['time_build'] += time.time() - start_time
+                    self.logs[f'{player}']['time_build'] += time.time() - start_time
                 if self.acc_settings["gather"]:
+                    start_time = time.time()
                     vil.gather()
+                    self.logs[f'{vil.v_id}']['time_gather'] += time.time() - start_time
+                    self.logs[f'{player}']['time_gather'] += time.time() - start_time
                 if self.acc_settings["farm"]:
+                    start_time = time.time()
                     vil.farm()
+                    self.logs[f'{vil.v_id}']['time_farm'] += time.time() - start_time
+                    self.logs[f'{player}']['time_farm'] += time.time() - start_time
                 if self.acc_settings["recruit"]:
+                    start_time = time.time()
                     vil.recruit()
+                    self.logs[f'{vil.v_id}']['time_recruit'] += time.time() - start_time
+                    self.logs[f'{player}']['time_recruit'] += time.time() - start_time
 
+                self.mongo.synch_log(self.logs, player)
+
+    def create_log_vil(self, v_id):  # create default in mongo and define only the keys in 'run' where  to track
+        if v_id in self.logs.keys():
+            return
+        default_log_vil = {
+            'time_vil': 0,
+            'time_build': 0,
+            'time_gather': 0,
+            'time_farm': 0,
+            'time_recruit': 0,
+            'time_farm_attacks': 0,
+            'time_scout_attacks': 0,
+            'time_ram_attacks': 0,
+            'time_cata_attacks': 0,
+            'count_farm_attacks': 0,
+            'count_scout_attacks': 0,
+            'count_ram_attacks': 0,
+            'count_cata_attacks': 0,
+            'count_gather_send': 0,
+            'count_buildings_build': 0,
+            'count_units_recruit': 0,
+        }
+        self.logs.update({f'{v_id}': default_log_vil})
 
     def synch_account(self):
         # Synch Account Data

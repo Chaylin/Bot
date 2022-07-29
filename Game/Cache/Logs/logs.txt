@@ -1,0 +1,33 @@
+use import logging...
+
+* jedes dorf getrennt
+* Zusammenfassung alle x stunden
+
+* Zeit verbraucht für:
+    - Farmangriffe
+    - Spähangriffe
+    - Wall rammen
+    - Gebäude katten
+    - Berichte lesen
+    - Raubzug
+    - Bauen
+    - Rekrutieren
+    - Pausieren aufgrund apm cap
+    - Pausieren aufgrund Bot-Schutz
+    - Karte scannen
+
+* loggen:
+    - Anzahl Farmangriffe
+    - Anzahl Spähangriffe
+    - Anzahl Wall rammen
+    - Anzahl Gebäude katten
+    - Anzahl Berichte lesen
+    - Anzahl Raubzug abgeschickt
+    - Anzahl Gebäude gebaut
+    - Anzahl Truppen rekrutiert
+    - Anzahl apm cap überschritten
+    - Anzahl Bot-Schutz ausgelöst
+    - Anzahl Karte gescannt
+
+* farmen:
+    -
