@@ -84,7 +84,7 @@ class Driver:
         input_pw.submit()
         time.sleep(5)
 
-        WebDriverWait(self.driver, 60).until(
+        WebDriverWait(self.driver, 120).until(
             EC.presence_of_element_located((By.CLASS_NAME, "world-select"))
          )
 
@@ -437,6 +437,8 @@ class Driver:
         pass
 
     def set_farmassist_farm(self, value_a, value_b, acc_settings):
+
+
         if self.fa_template_a != acc_settings["FA_template_A"]:
             # Change template A
             self.driver.find_element(By.NAME, f"spear[{value_a}]").clear()
@@ -452,6 +454,7 @@ class Driver:
             self.driver.find_element(By.NAME, f"heavy[{value_a}]").clear()
             self.driver.find_element(By.NAME, f"heavy[{value_a}]").send_keys(acc_settings["FA_template_A"]["heavy"])
             self.fa_template_a = acc_settings["FA_template_A"]
+
 
         if self.fa_template_b != acc_settings["FA_template_B"]:
             # Change template B
@@ -536,7 +539,7 @@ class Driver:
         return units
 
     def hit_template(self, v_id, temp):
-        time.sleep(0.3)
+        time.sleep(0.2)
         script = f"document.getElementsByClassName('farm_village_{v_id} farm_icon farm_icon_{temp}')[0].click()"
         try:
             self.driver.execute_script(script)

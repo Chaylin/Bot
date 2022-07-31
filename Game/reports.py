@@ -1,6 +1,7 @@
 import json
 import re
 import time
+from datetime import date
 
 from Game.extractor import Extractor
 from datetime import datetime
@@ -12,8 +13,10 @@ class ReportManager:
     mongo = None
     v_id = None
     world = None
+    player = None
     game_state = None
     last_reports = {}
+    logs = {}
 
     def __init__(self, driver=None, v_id=None, config=None, mongo=None):
         self.driver = driver
@@ -74,6 +77,9 @@ class ReportManager:
 
     def read(self, page=0, full_run=False):
         self.world = self.config.read_config("game", "account", "world")
+        self.player = self.config.read_config("game", "account", "username")
+        self.logs = self.config.get_cache("Logs", date.today())
+
         if len(self.last_reports) == 0:
             print("first run")
             self.last_reports = self.config.cache_grab("Reports")
@@ -90,6 +96,8 @@ class ReportManager:
             if report_id in self.last_reports:
                 continue
             new += 1
+            self.logs[self.player]['count_reports'] += 1
+            self.config.set_cache("Logs", date.today(), self.logs)
             url = f"https://de{self.world}.die-staemme.de/game.php?village={self.v_id}&screen=report&mode=all&group_id=0&view={report_id}"
             self.driver.navigate(url)
             time.sleep(2)
@@ -104,12 +112,15 @@ class ReportManager:
                 else:
                     res = self.put(report_id, report_type=report_type)
                     self.last_reports[report_id] = res
+
         if new == 12 or full_run and page < 20:
             page += 1
             print(
                 "%d new reports added, also check page %d" % (new, page)
             )
             return self.read(page, full_run=full_run)
+
+
 
     def re_unit(self, inp):
         output = {}

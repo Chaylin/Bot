@@ -12,6 +12,8 @@ from Game.discord import Discord
 
 import time
 from datetime import datetime
+from datetime import date
+
 
 
 class Bot:
@@ -22,7 +24,6 @@ class Bot:
     clear_village = {}
 
     acc_settings = {}
-    logs = {'date': None}
     start_sec = None
     apm = 0
     current_vil = None
@@ -38,6 +39,8 @@ class Bot:
     message = None
     reporter = None
     discord = None
+    logs = {'query': None}
+    update_logs = {}
 
     def start(self):
         self.login()
@@ -45,23 +48,22 @@ class Bot:
         self.infinity_loop()
 
     def infinity_loop(self):
-
         try:
             self.cycle()
-
         except:
-
             if self.driver.check_bot_captcha():
                 print("!!! Bot-Captcha active !!!")
                 time.sleep(10)
                 if self.driver.check_bot_captcha():
+                    self.logs = self.config.get_cache("Logs", date.today())
                     start_time = time.time()
                     player = self.config.read_config("game", "account", "username")
                     update = {"status": 'Alert'}
                     self.mongo.synch_player(player, update, None)
                     self.discord.send_message(f" Player[{player}] Bot-Captcha active !")
                     breakpoint()
-                    self.logs[f'{player}']['time_bot-captcha'] += time.time() - start_time
+                    self.logs[player]['time_bot-captcha'] += time.time() - start_time
+                    self.config.set_cache("Logs", date.today(), self.logs)
                     # Reset APM values
                     self.driver.actions = 0
                     self.apm = 0
@@ -82,11 +84,13 @@ class Bot:
             self.start_sec = datetime.timestamp(now)
         while True:
             player = self.config.read_config("game", "account", "username")
-            self.mongo.create_daily_log(player)
+            self.create_daily_log(player)
 
+            self.logs = self.config.get_cache("Logs", date.today())
             start_time = time.time()
             self.read_reports()
-            elf.logs[f'{player}']['time_reports'] += time.time() - start_time
+            self.logs[player]['time_reports'] += time.time() - start_time
+            self.config.set_cache("Logs", date.today(), self.logs)
 
             for vil in self.villages:
                 if self.current_vil and self.restart:
@@ -95,7 +99,11 @@ class Bot:
                 print(f"********************************************************\n"
                       f"VILLAGE: [{vil.v_name}]             ID:[{vil.v_id}] \n"
                       f"********************************************************")
+                start_time_vil = time.time()
+
                 self.create_log_vil(vil.v_id)
+                self.logs = self.config.get_cache("Logs", date.today())
+
 
                 self.current_vil = vil.v_id
                 self.restart = False
@@ -118,34 +126,81 @@ class Bot:
                         print(f"Pausing {pausing_random} seconds ... \n"
                               f"because {round(self.apm)} actions per minute, apm_cap = [{self.acc_settings['apm_cap']}]")
                         time.sleep(pausing_random)
-                        self.logs[f'{player}']['time_apm_cap'] += time.time() - start_time
+                        self.logs = self.config.get_cache("Logs", date.today())
+                        self.logs[player]['count_apm_cap'] += 1
+                        self.logs[player]['time_apm_cap'] += time.time() - start_time
+                        self.config.set_cache("Logs", date.today(), self.logs)
                 # ######################
 
                 if self.acc_settings["build"]:
                     start_time = time.time()
                     vil.build()
-                    self.logs[f'{vil.v_id}']['time_build'] += time.time() - start_time
-                    self.logs[f'{player}']['time_build'] += time.time() - start_time
+                    self.logs = self.config.get_cache("Logs", date.today())
+                    self.logs[str(vil.v_id)]['time_build'] += time.time() - start_time
+                    self.logs[player]['time_build'] += time.time() - start_time
+                    self.config.set_cache("Logs", date.today(), self.logs)
                 if self.acc_settings["gather"]:
                     start_time = time.time()
                     vil.gather()
-                    self.logs[f'{vil.v_id}']['time_gather'] += time.time() - start_time
-                    self.logs[f'{player}']['time_gather'] += time.time() - start_time
+                    self.logs = self.config.get_cache("Logs", date.today())
+                    self.logs[str(vil.v_id)]['time_gather'] += time.time() - start_time
+                    self.logs[player]['time_gather'] += time.time() - start_time
+                    self.config.set_cache("Logs", date.today(), self.logs)
                 if self.acc_settings["farm"]:
                     start_time = time.time()
                     vil.farm()
-                    self.logs[f'{vil.v_id}']['time_farm'] += time.time() - start_time
-                    self.logs[f'{player}']['time_farm'] += time.time() - start_time
+                    self.logs = self.config.get_cache("Logs", date.today())
+                    self.logs[str(vil.v_id)]['time_farm'] += time.time() - start_time
+                    self.logs[player]['time_farm'] += time.time() - start_time
+                    self.config.set_cache("Logs", date.today(), self.logs)
                 if self.acc_settings["recruit"]:
                     start_time = time.time()
                     vil.recruit()
-                    self.logs[f'{vil.v_id}']['time_recruit'] += time.time() - start_time
-                    self.logs[f'{player}']['time_recruit'] += time.time() - start_time
+                    self.logs = self.config.get_cache("Logs", date.today())
+                    self.logs[str(vil.v_id)]['time_recruit'] += time.time() - start_time
+                    self.logs[player]['time_recruit'] += time.time() - start_time
+                    self.config.set_cache("Logs", date.today(), self.logs)
 
+
+                self.logs = self.config.get_cache("Logs", date.today())
+                self.logs[str(vil.v_id)]['time_vil'] += time.time() - start_time_vil
+                self.config.set_cache("Logs", date.today(), self.logs)
                 self.mongo.synch_log(self.logs, player)
 
+
+    def create_daily_log(self, player):
+        default_log_acc = {
+            'query': f'{player} {date.today()}',
+            player: {
+                'time_build': 0,
+                'time_gather': 0,
+                'time_farm': 0,
+                'time_recruit': 0,
+                'time_reports': 0,
+                'time_apm_cap': 0,
+                'time_bot_captcha': 0,
+                'time_scan_map': 0,
+                'count_reports': 0,
+                'count_apm_cap': 0,
+                'count_bot_captcha': 0,
+                'count_scan_map': 0,
+                'count_farm_attacks': 0,
+                'count_scout_attacks': 0,
+                'count_ram_attacks': 0,
+                'count_cata_attacks': 0,
+                'count_gather_send': 0,
+                'count_buildings_build': 0,
+                'count_units_recruit': 0,
+            }
+        }
+        if self.logs['query']:
+            return
+        self.logs.update(default_log_acc)
+        self.config.set_cache("Logs", date.today(), self.logs)
+        self.logs = self.mongo.create_daily_log(player, self.logs)
+
     def create_log_vil(self, v_id):  # create default in mongo and define only the keys in 'run' where  to track
-        if v_id in self.logs.keys():
+        if str(v_id) in self.logs.keys():
             return
         default_log_vil = {
             'time_vil': 0,
@@ -165,7 +220,10 @@ class Bot:
             'count_buildings_build': 0,
             'count_units_recruit': 0,
         }
-        self.logs.update({f'{v_id}': default_log_vil})
+        vil_def = {str(v_id): default_log_vil}
+        self.logs.update(vil_def)
+        self.config.set_cache("Logs", date.today(), self.logs)
+        print(f'Create log for [{v_id}]')
 
     def synch_account(self):
         # Synch Account Data
@@ -186,6 +244,7 @@ class Bot:
             "gather": template[0]["gather"],
             "sleep": template[0]["sleep"],
             "apm_cap": template[0]["apm_cap"],
+            "night": template[0]["night"],
             "timeout_farm": template[0]["timeout_farm"],
             "timeout_scout": template[0]["timeout_scout"],
             "timeout_ram": template[0]["timeout_ram"],

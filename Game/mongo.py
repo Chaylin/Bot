@@ -1,10 +1,10 @@
 import pymongo
 from datetime import datetime
-import time
+from datetime import date
 
 
 class Mongo:
-    logs = None
+    logs = {}
 
     def __init__(self):
         self.client = pymongo.MongoClient(
@@ -67,54 +67,23 @@ class Mongo:
             self.own_villages.insert_one(data)
             return default_temp
 
-    def create_daily_log(self, player):
-        default_log_acc = {
-            'player': player,
-            'time_build': 0,
-            'time_gather': 0,
-            'time_farm': 0,
-            'time_recruit': 0,
-            'time_reports': 0,
-            'time_apm_cap': 0,
-            'time_bot_captcha': 0,
-            'time_scan_map': 0,
-            'count_reports': 0,
-            'count_apm_cap': 0,
-            'count_bot_captcha': 0,
-            'count_scan_map': 0,
-            'count_farm_attacks': 0,
-            'count_scout_attacks': 0,
-            'count_ram_attacks': 0,
-            'count_cata_attacks': 0,
-            'count_gather_send': 0,
-            'count_buildings_build': 0,
-            'count_units_recruit': 0,
-        }
-        self.logs.update({
-            'date': time.today(),
-            f'{player}': default_log_acc
-        })
-        query = {
-            'date': time.today(),
-            'player': player,
-                 }
+    def create_daily_log(self, player, default_log_acc):
+        query = {'query': f'{player} {date.today()}'}
         result = self.dblogs.find_one(query)
         if result:
-            return
+            return result
         else:
-            self.dblogs.insert_one(data)
+            self.dblogs.insert_one(default_log_acc)
 
     def synch_log(self, data, player):
-        query = {
-            'date': time.today(),
-            'player': player,
-        }
+        query = {'query': f'{player} {date.today()}'}
         result = self.dblogs.find_one(query)
         if result:
             update = {'$set': data}
             self.dblogs.update_one(query, update)
         else:
-            self.create_daily_log()
+            self.create_daily_log(player)
+            update = {'$set': data}
             self.dblogs.update_one(query, update)
 
 
@@ -122,7 +91,7 @@ class Mongo:
         query = {"command_id": command_id}
         self.player.delete_one(query)
 
-    def response_attack(self,command_id, v_id, response):
+    def response_attack(self, command_id, v_id, response):
         query = {"command_id": command_id}
         response.append(v_id)
         update = {"$set": {"response": response}}

@@ -108,8 +108,11 @@ class ConfigStuff:
 
     def set_cache(self, cache, v_id, entry):
         path = self.cache_path.joinpath(f"{cache}/{v_id}.json")
+        if '_id' in entry.keys():
+            entry.pop('_id')
         with open(path, "w") as f:
-            return f.write(json.dumps(entry, indent=2))
+            return f.write(json.dumps(entry))
+
 
     def cache_grab(self, cache):
         output = {}

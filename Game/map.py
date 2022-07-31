@@ -1,5 +1,6 @@
 import math
 import time
+from datetime import date
 
 
 class Map:
@@ -9,6 +10,8 @@ class Map:
     config = None
     extractor = None
     mongo = None
+    logs = {}
+    player = None
 
     map = None
     map_data = []
@@ -34,6 +37,9 @@ class Map:
     def get_map(self):
         if self.last_fetch + (self.fetch_delay * 3600) > time.time():
             return
+        self.player = self.config.read_config("game", "account", "username")
+        start_time = time.time()
+        self.logs = self.config.get_cache("Logs", date.today())
         self.driver.navigate_map(
             self.world,
             self.v_id,
@@ -83,7 +89,11 @@ class Map:
                     ]
         if not self.map_data or not self.villages:
             return self.get_map_old(game_state=game_state)
+        self.logs[self.player]['count_scan_map'] += 1
+        self.logs[self.player]['time_scan_map'] += time.time() - start_time
+        self.config.set_cache("Logs", date.today(), self.logs)
         return True
+
 
     def get_map_old(self, game_state):
         if self.map_data:

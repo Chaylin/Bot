@@ -1,13 +1,16 @@
 import time
 from datetime import datetime
 from datetime import timedelta
+from datetime import date
 
 
 class AttackManager:
     vil_settings = None
     acc_settings = None
+    logs = {}
 
     v_id = None
+    player = None
     world = None
     driver = None
     config = None
@@ -51,6 +54,8 @@ class AttackManager:
     def farming(self, vil_settings, acc_settings):
         self.vil_settings = vil_settings
         self.acc_settings = acc_settings
+        self.logs = self.config.get_cache("Logs", date.today())
+        self.player = self.config.read_config("game", "account", "username")
 
         self.world = self.config.read_config("game", "account", "world")
         if not self.my_location:
@@ -61,14 +66,23 @@ class AttackManager:
         self.farm_assist()
 
     def farm_assist(self):
-        # get_h = time.localtime().tm_hour
-        # if get_h in range(0, 6) or get_h == 23:
-        #    night = 2
-        #    print(f"[Night Mode] active --> Sending x{night} farm units")
-        # else:
-        #    night = 1
-        #    print(f"[Day Mode] active --> Sending normal values")
-        night = 1
+
+        get_h = time.localtime().tm_hour
+        if get_h in range(0, 7):
+            night = int(self.acc_settings["night"])
+            print(f"[Night Mode] active --> Sending x{night} times farm units")
+        else:
+            night = 1
+            print(f"[Day Mode] active --> Sending normal values")
+
+        tmp_dict_a = {}
+        for x, y in self.acc_settings["FA_template_A"].items():
+            tmp_dict_a.update({x: (y * night)})
+        self.acc_settings.update({"FA_template_A": tmp_dict_a})
+        tmp_dict_b = {}
+        for x, y in self.acc_settings["FA_template_B"].items():
+            tmp_dict_b.update({x: (y * night)})
+        self.acc_settings.update({"FA_template_B": tmp_dict_b})
 
         time_between_farm = int(self.acc_settings["timeout_farm"])
         time_between_scout = int(self.acc_settings["timeout_scout"])
@@ -94,7 +108,7 @@ class AttackManager:
         self.total_ram = int(self.units["ram"])
         self.total_cata = int(self.units["catapult"])
 
-        source = self.driver.get_source()
+
         # value_a, value_b = self.get_FA_IDs(source)
         value_a = self.config.read_config("game", "account", "value_a")
         value_b = self.config.read_config("game", "account", "value_b")
@@ -119,8 +133,9 @@ class AttackManager:
         if targets_count == 0:
             return
 
-        # Crushing Wall
         if farm_units:
+            # Crushing Wall
+            start_time = time.time()
             if self.vil_settings["crush_wall"]:
                 if self.total_ram >= 5 and self.total_axe >= 10 and self.total_spy >= 1:
                     for tar in self.list_villages:
@@ -168,6 +183,8 @@ class AttackManager:
                                                         f"Crushing wall of village [{target_entry['id']}] Distance: [{round(distance, 2)}] sending {ram_count} rams and {axe_count} axe")
                                                     self.driver.navigate_attack(self.world, self.v_id,
                                                                                 target_entry['id'])
+                                                    self.logs[self.player]['count_ram_attacks'] += 1
+                                                    self.logs[str(self.v_id)]['count_ram_attacks'] += 1
                                                     if not self.driver.attack(ram=ram_count,
                                                                               axe=axe_count,
                                                                               spy=spy_count,
@@ -188,7 +205,9 @@ class AttackManager:
                                                     self.total_spy -= spy_count
                                                     self.mongo.upload_ram_attack_villages(target_entry["id"],
                                                                                           impact)
+            self.logs[str(self.v_id)]['time_ram_attacks'] += time.time() - start_time
             # Crushing Buildings
+            start_time = time.time()
             if self.vil_settings["crush_building"]:
                 if self.total_cata >= 25 and self.total_ram >= 5 and self.total_axe >= 15 and self.total_spy >= 1:
                     for tar in self.list_villages:
@@ -224,6 +243,8 @@ class AttackManager:
                                                             f"Crushing main of village [{target_entry['id']}] Distance: [{round(distance, 2)}] sending {ram_count} rams {cata_count} cata and {axe_count} axe")
                                                         self.driver.navigate_attack(self.world, self.v_id,
                                                                                     target_entry['id'])
+                                                        self.logs[self.player]['count_cata_attacks'] += 1
+                                                        self.logs[str(self.v_id)]['count_cata_attacks'] += 1
                                                         if not self.driver.attack(ram=ram_count,
                                                                                   cata=cata_count,
                                                                                   axe=axe_count,
@@ -246,12 +267,12 @@ class AttackManager:
                                                         self.total_spy -= spy_count
                                                         self.mongo.upload_ram_attack_villages(target_entry["id"],
                                                                                               impact)
-
             current_url = self.driver.get_url()
             if not "am_farm" in current_url:
                 self.driver.navigate_farmassist(self.v_id, self.world)
-
+            self.logs[str(self.v_id)]['time_cata_attacks'] += time.time() - start_time
             # Scouting
+            start_time = time.time()
             pages = self.driver.get_FA_pages()
             i = 0
             while i < pages or i == 2:
@@ -276,6 +297,8 @@ class AttackManager:
                                             f"Village [{target_entry['id']}] ({location_text}) Distance: [{round(distance, 2)}] --> Scouting ( 1 spy )")
                                         self.driver.navigate_attack(self.world, self.v_id,
                                                                     target_entry['id'])
+                                        self.logs[self.player]['count_scout_attacks'] += 1
+                                        self.logs[str(self.v_id)]['count_scout_attacks'] += 1
                                         if not self.driver.attack(spy=1, attack=True):
                                             self.driver.navigate_farmassist(self.v_id, self.world)
                                             farm_units = self.driver.get_units_farmassist()
@@ -293,8 +316,9 @@ class AttackManager:
                     print("Check next page")
 
             self.driver.navigate_farmassist(self.v_id, self.world)
-
+            self.logs[str(self.v_id)]['time_scout_attacks'] += time.time() - start_time
             # Attacking with A / B
+            start_time = time.time()
             pages = self.driver.get_FA_pages()
             i = 0
             while i < pages or i == 2:
@@ -341,19 +365,23 @@ class AttackManager:
                                             passed += 1
                                     if passed == len(target_entry["last attack"]):
                                         if int(self.acc_settings["FA_template_A"]["spear"]) > 0:
-                                            if self.total_spear < (self.acc_settings["FA_template_B"]["spear"] + int(self.vil_settings["hold_back_gather"]["spear"])):
+                                            if self.total_spear < (self.acc_settings["FA_template_B"]["spear"] + int(
+                                                    self.vil_settings["hold_back_gather"]["spear"])):
                                                 print("Not enough units ; break")
                                                 break
                                         if int(self.acc_settings["FA_template_A"]["sword"]) > 0:
-                                            if self.total_sword < (self.acc_settings["FA_template_B"]["sword"] + int(self.vil_settings["hold_back_gather"]["sword"])):
+                                            if self.total_sword < (self.acc_settings["FA_template_B"]["sword"] + int(
+                                                    self.vil_settings["hold_back_gather"]["sword"])):
                                                 print("Not enough units ; break")
                                                 break
                                         if int(self.acc_settings["FA_template_A"]["axe"]) > 0:
-                                            if self.total_axe < (self.acc_settings["FA_template_B"]["axe"] + int(self.vil_settings["hold_back_gather"]["axe"])):
+                                            if self.total_axe < (self.acc_settings["FA_template_B"]["axe"] + int(
+                                                    self.vil_settings["hold_back_gather"]["axe"])):
                                                 print("Not enough units ; break")
                                                 break
                                         if int(self.acc_settings["FA_template_A"]["archer"]) > 0:
-                                            if self.total_archer < (self.acc_settings["FA_template_B"]["archer"] + int(self.vil_settings["hold_back_gather"]["archer"])):
+                                            if self.total_archer < (self.acc_settings["FA_template_B"]["archer"] + int(
+                                                    self.vil_settings["hold_back_gather"]["archer"])):
                                                 print("Not enough units ; break")
                                                 break
                                         '''if int(self.acc_settings["FA_template_A"]["spy"]) > 0:
@@ -361,22 +389,27 @@ class AttackManager:
                                                 print("Not enough units ; break")
                                                 break'''
                                         if int(self.acc_settings["FA_template_A"]["light"]) > 0:
-                                            if self.total_light < (self.acc_settings["FA_template_B"]["light"] + int(self.vil_settings["hold_back_gather"]["light"])):
+                                            if self.total_light < (self.acc_settings["FA_template_B"]["light"] + int(
+                                                    self.vil_settings["hold_back_gather"]["light"])):
                                                 print("Not enough units ; break")
                                                 break
                                         if int(self.acc_settings["FA_template_A"]["marcher"]) > 0:
-                                            if self.total_marcher < (self.acc_settings["FA_template_B"]["marcher"] + int(self.vil_settings["hold_back_gather"]["marcher"])):
+                                            if self.total_marcher < (
+                                                    self.acc_settings["FA_template_B"]["marcher"] + int(
+                                                    self.vil_settings["hold_back_gather"]["marcher"])):
                                                 print("Not enough units ; break")
                                                 break
                                         if int(self.acc_settings["FA_template_A"]["heavy"]) > 0:
-                                            if self.total_heavy < (self.acc_settings["FA_template_B"]["heavy"] + int(self.vil_settings["hold_back_gather"]["heavy"])):
+                                            if self.total_heavy < (self.acc_settings["FA_template_B"]["heavy"] + int(
+                                                    self.vil_settings["hold_back_gather"]["heavy"])):
                                                 print("Not enough units ; break")
                                                 break
-
 
                                         print(
                                             f"Village [{target_entry['id']}] ({location_text}) Distance: [{round(distance, 2)}] --> Attacking [A]")
 
+                                        self.logs[str(self.v_id)]['count_farm_attacks'] += 1
+                                        self.logs[self.player]['count_farm_attacks'] += 1
                                         self.driver.hit_template(target_entry["id"], "a")
                                         self.total_spear -= self.acc_settings["FA_template_A"]["spear"]
                                         self.total_sword -= self.acc_settings["FA_template_A"]["sword"]
@@ -436,19 +469,23 @@ class AttackManager:
                                             passed += 1
                                     if passed == len(target_entry["last attack"]):
                                         if int(self.acc_settings["FA_template_B"]["spear"]) > 0:
-                                            if self.total_spear < (self.acc_settings["FA_template_B"]["spear"] + int(self.vil_settings["hold_back_gather"]["spear"])):
+                                            if self.total_spear < (self.acc_settings["FA_template_B"]["spear"] + int(
+                                                    self.vil_settings["hold_back_gather"]["spear"])):
                                                 print("Not enough units ; break")
                                                 break
                                         if int(self.acc_settings["FA_template_B"]["sword"]) > 0:
-                                            if self.total_sword < (self.acc_settings["FA_template_B"]["sword"] + int(self.vil_settings["hold_back_gather"]["sword"])):
+                                            if self.total_sword < (self.acc_settings["FA_template_B"]["sword"] + int(
+                                                    self.vil_settings["hold_back_gather"]["sword"])):
                                                 print("Not enough units ; break")
                                                 break
                                         if int(self.acc_settings["FA_template_B"]["axe"]) > 0:
-                                            if self.total_axe < (self.acc_settings["FA_template_B"]["axe"] + int(self.vil_settings["hold_back_gather"]["axe"])):
+                                            if self.total_axe < (self.acc_settings["FA_template_B"]["axe"] + int(
+                                                    self.vil_settings["hold_back_gather"]["axe"])):
                                                 print("Not enough units ; break")
                                                 break
                                         if int(self.acc_settings["FA_template_B"]["archer"]) > 0:
-                                            if self.total_archer < (self.acc_settings["FA_template_B"]["archer"] + int(self.vil_settings["hold_back_gather"]["archer"])):
+                                            if self.total_archer < (self.acc_settings["FA_template_B"]["archer"] + int(
+                                                    self.vil_settings["hold_back_gather"]["archer"])):
                                                 print("Not enough units ; break")
                                                 break
                                         '''if int(self.acc_settings["FA_template_B"]["spy"]) > 0:
@@ -456,22 +493,26 @@ class AttackManager:
                                                 print("Not enough units ; break")
                                                 break'''
                                         if int(self.acc_settings["FA_template_B"]["light"]) > 0:
-                                            if self.total_light < (self.acc_settings["FA_template_B"]["light"] + int(self.vil_settings["hold_back_gather"]["light"])):
+                                            if self.total_light < (self.acc_settings["FA_template_B"]["light"] + int(
+                                                    self.vil_settings["hold_back_gather"]["light"])):
                                                 print("Not enough units ; break")
                                                 break
                                         if int(self.acc_settings["FA_template_B"]["marcher"]) > 0:
-                                            if self.total_marcher < (self.acc_settings["FA_template_B"]["marcher"] + int(self.vil_settings["hold_back_gather"]["marcher"])):
+                                            if self.total_marcher < (
+                                                    self.acc_settings["FA_template_B"]["marcher"] + int(
+                                                    self.vil_settings["hold_back_gather"]["marcher"])):
                                                 print("Not enough units ; break")
                                                 break
                                         if int(self.acc_settings["FA_template_B"]["heavy"]) > 0:
-                                            if self.total_heavy < (self.acc_settings["FA_template_B"]["heavy"] + int(self.vil_settings["hold_back_gather"]["heavy"])):
+                                            if self.total_heavy < (self.acc_settings["FA_template_B"]["heavy"] + int(
+                                                    self.vil_settings["hold_back_gather"]["heavy"])):
                                                 print("Not enough units ; break")
                                                 break
 
-
                                         print(
                                             f"Village [{target_entry['id']}] ({location_text}) Distance: [{round(distance, 2)}] --> Attacking [B]")
-
+                                        self.logs[str(self.v_id)]['count_farm_attacks'] += 1
+                                        self.logs[self.player]['count_farm_attacks'] += 1
                                         self.driver.hit_template(target_entry["id"], "b")
                                         self.total_spear -= self.acc_settings["FA_template_B"]["spear"]
                                         self.total_sword -= self.acc_settings["FA_template_B"]["sword"]
@@ -496,6 +537,7 @@ class AttackManager:
                     self.driver.navigate(url)
                     print("Check next page")
 
+            self.logs[str(self.v_id)]['time_scout_attacks'] += time.time() - start_time
             # Extra Attacks
             if self.total_light >= 150:
                 for tar in self.list_villages:
@@ -548,6 +590,8 @@ class AttackManager:
                                                         self.total_light -= light_count
                                                         self.mongo.upload_extra_attack_villages(target_entry["id"],
                                                                                                 impact)
+
+        self.config.set_cache("Logs", date.today(), self.logs)
 
     def should_farm(self):
         if not self.next_time_farm:

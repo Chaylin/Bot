@@ -1,9 +1,11 @@
 from datetime import datetime
+from datetime import date
 
 
 class Gather:
     vil_settings = None
-
+    player = None
+    logs = {}
     v_id = None
     world = None
     driver = None
@@ -23,8 +25,9 @@ class Gather:
 
     def gathering(self, settings):
         self.vil_settings = settings
-
+        self.player = self.config.read_config("game", "account", "username")
         self.world = self.config.read_config("game", "account", "world")
+        self.logs = self.config.get_cache("Logs", date.today())
         if not self.should_gather():
             return self.next_time_gather
 
@@ -93,17 +96,26 @@ class Gather:
 
         if not village_data["options"]["1"]["is_locked"]:
             if not r1 == 0:
+                self.logs[str(self.v_id)]['count_gather_send'] += 1
+                self.logs[self.player]['count_gather_send'] += 1
                 self.driver.send_gather(village_data, float(r1), self.vil_settings["hold_back_gather"], self.vil_settings["gather_units"], self.game_data)
         if not village_data["options"]["2"]["is_locked"]:
             if not r2 == 0:
+                self.logs[str(self.v_id)]['count_gather_send'] += 1
+                self.logs[self.player]['count_gather_send'] += 1
                 self.driver.send_gather(village_data, float(r2), self.vil_settings["hold_back_gather"], self.vil_settings["gather_units"], self.game_data)
         if not village_data["options"]["3"]["is_locked"]:
             if not r3 == 0:
+                self.logs[str(self.v_id)]['count_gather_send'] += 1
+                self.logs[self.player]['count_gather_send'] += 1
                 self.driver.send_gather(village_data, float(r3), self.vil_settings["hold_back_gather"], self.vil_settings["gather_units"], self.game_data)
         if not village_data["options"]["4"]["is_locked"]:
             if not r4 == 0:
+                self.logs[str(self.v_id)]['count_gather_send'] += 1
+                self.logs[self.player]['count_gather_send'] += 1
                 self.driver.send_gather(village_data, float(r4), self.vil_settings["hold_back_gather"], self.vil_settings["gather_units"], self.game_data)
 
+        self.config.set_cache("Logs", date.today(), self.logs)
         gather_time_remaining = self.driver.get_gather_time()
 
         return gather_time_remaining
