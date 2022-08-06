@@ -35,6 +35,7 @@ class Map:
         self.world = world
 
     def get_map(self):
+        return
         if self.last_fetch + (self.fetch_delay * 3600) > time.time():
             return
         self.player = self.config.read_config("game", "account", "username")

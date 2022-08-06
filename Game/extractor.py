@@ -192,6 +192,46 @@ class Extractor:
         return data
 
     @staticmethod
+    def FA_value(res):
+        if type(res) != str:
+            res = res.text
+        tmp = re.findall(r'(?s)<h3>Farm-Assistent</h3>.+?<form id="farm_units">', res)
+        value = re.findall(r'(?s)name="spear(.+?)"', tmp[0])
+        return value
+
+    @staticmethod
+    def farmassist_table(res):
+        if type(res) != str:
+            res = res.text
+        tmp = re.findall(r'(?s)<table id="plunder_list" style="width:100%;">.+?<div id="plunder_list_nav" style="width:100%;">', res)
+        text_fa = re.findall(r'(?s)Alle Berichte für dieses Dorf löschen(.+?)onclick="return Accountmanager.farm.sendUnits', tmp[0])
+        village_id = re.findall(r'(?s)<tr id="village_(\d+)" class="report_', tmp[0])
+
+        sieg = []
+        beute = []
+        for i in text_fa:
+            if "Völliger Sieg" in i:
+                sieg.append('Völliger Sieg')
+            if "Verluste" in i:
+                sieg.append('Verluste')
+            if "Erspäht" in i:
+                sieg.append('Erspäht')
+        for i in text_fa:
+            if "Volle Beute" in i:
+                beute.append('Volle Beute')
+            if "Teilweise" in i:
+                beute.append('Teilweise Beute')
+        targets = {}
+        for i in range(len(village_id)):
+            structure = {i+1: {
+                'id': village_id[i],
+                'Sieg': sieg[i],
+                'Beute': beute[i],
+            }}
+            targets.update(structure)
+        return targets
+
+    @staticmethod
     def attack_form(res):
         if type(res) != str:
             res = res.text

@@ -20,8 +20,8 @@ class Driver:
     driver = None
     first_run = True
     actions = 0
-    fa_template_a = {}
-    fa_template_b = {}
+    FA_temp_kav = False
+    FA_temp_inf = False
 
     def __init__(self, driver_path=None):
         self.driver_path = driver_path
@@ -41,31 +41,6 @@ class Driver:
         self.actions += 1
         self.driver.refresh()
 
-    def solve_captcha(self):
-        api_key = '7eab5e4307d40edc4858ce865171bfce'
-        site_key_login = ''
-        sitekey_ingame = 'b413369f-bb15-4015-bacd-dd180021827c'
-
-        time.sleep(3)
-        url = self.driver.current_url
-
-        solver = TwoCaptcha(api_key)
-        result = solver.hcaptcha(sitekey=sitekey_ingame, url=url)
-        code = result['code']
-        print(code)
-        print("Captcha Solved, Thanks 2Captcha")
-
-        self.driver.execute_script("document.getElementsByName('h-captcha-response')[0].style.display='';")
-        time.sleep(1)
-        self.driver.execute_script(f"document.getElementsByName('h-captcha-response')[0].innerHTML='{code}'")
-
-        self.driver.execute_script("document.getElementsByName('g-recaptcha-response')[0].style.display='';")
-        time.sleep(1)
-        self.driver.execute_script(f"document.getElementsByName('g-recaptcha-response')[0].innerHTML='{code}'")
-        print("done")
-        time.sleep(5)
-        self.driver.execute_script("document.getElementsByClassName('button-submit button')[0].click()")
-        time.sleep(60)
 
     @staticmethod
     def find_between(s, first, last):
@@ -138,36 +113,10 @@ class Driver:
         sum_time = sum_time + datetime.now()
         return sum_time
 
-    def rename_attacks(self):
-        checkbox_all = self.driver.find_element(By.ID, "select_all")
-        checkbox_all.click()
-        btn_rename = self.driver.find_element(By.NAME, "label")
-        btn_rename.click()
-        self.actions += 1
-
-    def cancel_safeattack(self, v_id):
-        cancel = self.driver.find_elements(By.CLASS_NAME, "command-cancel")
-        for x in cancel:
-            if v_id in x.get_attribute("href"):
-                self.driver.get(x.get_attribute("href"))
-                self.actions += 1
-
     def get_coords_from_target(self):
         time.sleep(1)
         s = self.driver.find_elements(By.CLASS_NAME, "village-name")[0].get_attribute("innerText")
         return s
-
-    def attack_ds_ultimate(self, attack_type):
-        # attack_types
-        #   Attack
-        #   Conquer
-        #   Fake
-        #   WallCrush
-        if attack_type == "Attack":
-            self.driver.execute_script("document.getElementById('units_entry_all_axe').click()")
-            self.driver.execute_script("document.getElementById('units_entry_all_light').click()")
-            self.driver.execute_script("document.getElementById('units_entry_all_ram').click()")
-            self.driver.execute_script("document.getElementById('units_entry_all_catapult').click()")
 
     def attack(self,
                spear=0,
@@ -241,11 +190,6 @@ class Driver:
             print("Not enough units")
             return False
 
-    def filter_dot_blue(self):
-        self.driver.execute_script("document.getElementById('filter_dots_blue').checked = true")
-        self.actions += 1
-        time.sleep(1)
-
     def switch_village(self):
 
         try:
@@ -270,6 +214,11 @@ class Driver:
 
     def navigate_login(self):
         url = "https://www.die-staemme.de/"
+        self.driver.get(url)
+        self.actions += 1
+
+    def navigate_overview_troops(self, world):
+        url = f"https://de{world}.die-staemme.de/game.php?village=&screen=overview_villages&mode=units"
         self.driver.get(url)
         self.actions += 1
 
@@ -436,48 +385,79 @@ class Driver:
     def get_FA_IDs(self, source):
         pass
 
-    def set_farmassist_farm(self, value_a, value_b, acc_settings):
+    def set_farmassist_temp_kav(self, value_a, value_b):
+        if self.FA_temp_kav:
+            return
+        # Change template A
+        self.driver.find_element(By.NAME, f"spear{value_a}").clear()
+        self.driver.find_element(By.NAME, f"spear{value_a}").send_keys(0)
+        self.driver.find_element(By.NAME, f"sword{value_a}").clear()
+        self.driver.find_element(By.NAME, f"sword{value_a}").send_keys(0)
+        self.driver.find_element(By.NAME, f"axe{value_a}").clear()
+        self.driver.find_element(By.NAME, f"axe{value_a}").send_keys(0)
+        self.driver.find_element(By.NAME, f"spy{value_a}").clear()
+        self.driver.find_element(By.NAME, f"spy{value_a}").send_keys(0)
+        self.driver.find_element(By.NAME, f"light{value_a}").clear()
+        self.driver.find_element(By.NAME, f"light{value_a}").send_keys(15)
+        self.driver.find_element(By.NAME, f"heavy{value_a}").clear()
+        self.driver.find_element(By.NAME, f"heavy{value_a}").send_keys(0)
 
-
-        if self.fa_template_a != acc_settings["FA_template_A"]:
-            # Change template A
-            self.driver.find_element(By.NAME, f"spear[{value_a}]").clear()
-            self.driver.find_element(By.NAME, f"spear[{value_a}]").send_keys(acc_settings["FA_template_A"]["spear"])
-            self.driver.find_element(By.NAME, f"sword[{value_a}]").clear()
-            self.driver.find_element(By.NAME, f"sword[{value_a}]").send_keys(acc_settings["FA_template_A"]["sword"])
-            self.driver.find_element(By.NAME, f"axe[{value_a}]").clear()
-            self.driver.find_element(By.NAME, f"axe[{value_a}]").send_keys(acc_settings["FA_template_A"]["axe"])
-            self.driver.find_element(By.NAME, f"spy[{value_a}]").clear()
-            self.driver.find_element(By.NAME, f"spy[{value_a}]").send_keys(acc_settings["FA_template_A"]["spy"])
-            self.driver.find_element(By.NAME, f"light[{value_a}]").clear()
-            self.driver.find_element(By.NAME, f"light[{value_a}]").send_keys(acc_settings["FA_template_A"]["light"])
-            self.driver.find_element(By.NAME, f"heavy[{value_a}]").clear()
-            self.driver.find_element(By.NAME, f"heavy[{value_a}]").send_keys(acc_settings["FA_template_A"]["heavy"])
-            self.fa_template_a = acc_settings["FA_template_A"]
-
-
-        if self.fa_template_b != acc_settings["FA_template_B"]:
-            # Change template B
-            self.driver.find_element(By.NAME, f"spear[{value_b}]").clear()
-            self.driver.find_element(By.NAME, f"spear[{value_b}]").send_keys(acc_settings["FA_template_B"]["spear"])
-            self.driver.find_element(By.NAME, f"sword[{value_b}]").clear()
-            self.driver.find_element(By.NAME, f"sword[{value_b}]").send_keys(acc_settings["FA_template_B"]["sword"])
-            self.driver.find_element(By.NAME, f"axe[{value_b}]").clear()
-            self.driver.find_element(By.NAME, f"axe[{value_b}]").send_keys(acc_settings["FA_template_B"]["axe"])
-            self.driver.find_element(By.NAME, f"spy[{value_b}]").clear()
-            self.driver.find_element(By.NAME, f"spy[{value_b}]").send_keys(acc_settings["FA_template_B"]["spy"])
-            self.driver.find_element(By.NAME, f"light[{value_b}]").clear()
-            self.driver.find_element(By.NAME, f"light[{value_b}]").send_keys(acc_settings["FA_template_B"]["light"])
-            self.driver.find_element(By.NAME, f"heavy[{value_b}]").clear()
-            self.driver.find_element(By.NAME, f"heavy[{value_b}]").send_keys(acc_settings["FA_template_B"]["heavy"])
-            self.fa_template_b = acc_settings["FA_template_B"]
+        # Change template B
+        self.driver.find_element(By.NAME, f"spear{value_b}").clear()
+        self.driver.find_element(By.NAME, f"spear{value_b}").send_keys(0)
+        self.driver.find_element(By.NAME, f"sword{value_b}").clear()
+        self.driver.find_element(By.NAME, f"sword{value_b}").send_keys(0)
+        self.driver.find_element(By.NAME, f"axe{value_b}").clear()
+        self.driver.find_element(By.NAME, f"axe{value_b}").send_keys(0)
+        self.driver.find_element(By.NAME, f"spy{value_b}").clear()
+        self.driver.find_element(By.NAME, f"spy{value_b}").send_keys(0)
+        self.driver.find_element(By.NAME, f"light{value_b}").clear()
+        self.driver.find_element(By.NAME, f"light{value_b}").send_keys(0)
+        self.driver.find_element(By.NAME, f"heavy{value_b}").clear()
+        self.driver.find_element(By.NAME, f"heavy{value_b}").send_keys(25)
 
         time.sleep(1)
         self.driver.execute_script("document.getElementsByClassName('btn')[0].click()")
-
         self.actions += 1
+        self.FA_temp_kav = True
+        self.FA_temp_inf = False
 
-        self.first_run = False
+    def set_farmassist_temp_inf(self, value_a, value_b):
+        if self.FA_temp_inf:
+            return
+        # Change template A
+        self.driver.find_element(By.NAME, f"spear{value_a}").clear()
+        self.driver.find_element(By.NAME, f"spear{value_a}").send_keys(50)
+        self.driver.find_element(By.NAME, f"sword{value_a}").clear()
+        self.driver.find_element(By.NAME, f"sword{value_a}").send_keys(0)
+        self.driver.find_element(By.NAME, f"axe{value_a}").clear()
+        self.driver.find_element(By.NAME, f"axe{value_a}").send_keys(0)
+        self.driver.find_element(By.NAME, f"spy{value_a}").clear()
+        self.driver.find_element(By.NAME, f"spy{value_a}").send_keys(0)
+        self.driver.find_element(By.NAME, f"light{value_a}").clear()
+        self.driver.find_element(By.NAME, f"light{value_a}").send_keys(0)
+        self.driver.find_element(By.NAME, f"heavy{value_a}").clear()
+        self.driver.find_element(By.NAME, f"heavy{value_a}").send_keys(0)
+
+        # Change template B
+        self.driver.find_element(By.NAME, f"spear{value_b}").clear()
+        self.driver.find_element(By.NAME, f"spear{value_b}").send_keys(0)
+        self.driver.find_element(By.NAME, f"sword{value_b}").clear()
+        self.driver.find_element(By.NAME, f"sword{value_b}").send_keys(0)
+        self.driver.find_element(By.NAME, f"axe{value_b}").clear()
+        self.driver.find_element(By.NAME, f"axe{value_b}").send_keys(100)
+        self.driver.find_element(By.NAME, f"spy{value_b}").clear()
+        self.driver.find_element(By.NAME, f"spy{value_b}").send_keys(0)
+        self.driver.find_element(By.NAME, f"light{value_b}").clear()
+        self.driver.find_element(By.NAME, f"light{value_b}").send_keys(0)
+        self.driver.find_element(By.NAME, f"heavy{value_b}").clear()
+        self.driver.find_element(By.NAME, f"heavy{value_b}").send_keys(0)
+
+        time.sleep(1)
+        self.driver.execute_script("document.getElementsByClassName('btn')[0].click()")
+        self.actions += 1
+        self.FA_temp_kav = False
+        self.FA_temp_inf = True
 
     def set_farmassist_checks(self):
         if not self.first_run:
@@ -497,43 +477,34 @@ class Driver:
         self.driver.execute_script("document.getElementById('full_hauls_checkbox').checked = false")
         self.actions += 1
 
-    def set_farmassist_scout(self, value):
-        # Change template A
-        self.driver.find_element(By.NAME, f"spear[{value}]").clear()
-        self.driver.find_element(By.NAME, f"spear[{value}]").send_keys("0")
-        self.driver.find_element(By.NAME, f"sword[{value}]").clear()
-        self.driver.find_element(By.NAME, f"sword[{value}]").send_keys("0")
-        self.driver.find_element(By.NAME, f"axe[{value}]").clear()
-        self.driver.find_element(By.NAME, f"axe[{value}]").send_keys("0")
-        self.driver.find_element(By.NAME, f"spy[{value}]").clear()
-        self.driver.find_element(By.NAME, f"spy[{value}]").send_keys("1")
-        self.driver.find_element(By.NAME, f"light[{value}]").clear()
-        self.driver.find_element(By.NAME, f"light[{value}]").send_keys("0")
-        self.driver.find_element(By.NAME, f"heavy[{value}]").clear()
-        self.driver.find_element(By.NAME, f"heavy[{value}]").send_keys("0")
 
-        time.sleep(1)
-        self.driver.execute_script("document.getElementsByClassName('btn')[0].click()")
-        print("Set template [A] to 1 scout")
-        self.actions += 1
-
-    def get_units_farmassist(self):
+    def get_units_farmassist(self, game_data):
         # Get units
         units = {}
         spear = self.driver.find_element(By.ID, "spear").get_attribute("innerText")
         sword = self.driver.find_element(By.ID, "sword").get_attribute("innerText")
+        if 'archer' in game_data['units']:
+            archer = self.driver.find_element(By.ID, "archer").get_attribute("innerText")
+        else:
+            archer = 0
         axe = self.driver.find_element(By.ID, "axe").get_attribute("innerText")
         spy = self.driver.find_element(By.ID, "spy").get_attribute("innerText")
         light = self.driver.find_element(By.ID, "light").get_attribute("innerText")
+        if 'marcher' in game_data['units']:
+            marcher = self.driver.find_element(By.ID, "marcher").get_attribute("innerText")
+        else:
+            marcher = 0
         heavy = self.driver.find_element(By.ID, "heavy").get_attribute("innerText")
 
         structure = {
-            "spear": spear,
-            "sword": sword,
-            "axe": axe,
-            "spy": spy,
-            "light": light,
-            "heavy": heavy,
+            "spear": int(spear),
+            "sword": int(sword),
+            "archer": int(archer),
+            "axe": int(axe),
+            "spy": int(spy),
+            "light": int(light),
+            "marcher": int(marcher),
+            "heavy": int(heavy),
         }
         units.update(structure)
         return units
