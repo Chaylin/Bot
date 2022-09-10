@@ -52,22 +52,13 @@ class AttackManager:
     def farm_assist(self):
         time_between_farm = int(self.acc_settings["timeout_farm"])
         self.driver.navigate_farmassist(self.v_id, self.world)
-
+        self.driver.check_captcha()
         self.units = self.driver.get_units_farmassist(self.game_data)
         source = self.driver.get_source()
         value = self.extractor.FA_value(source)
         value_a = value[0]
         value_b = value[1]
-        hold_back = {
-            'spear': 500,
-            'sword': 0,
-            'axe': 0,
-            'archer': 0,
-            'spy': 0,
-            'light': 0,
-            'marcher': 0,
-            'heavy': 100,
-        }
+        hold_back = self.vil_settings['hold_back_farm']
 
         time.sleep(0.5)
 
@@ -75,8 +66,14 @@ class AttackManager:
         self.targets = self.extractor.farmassist_table(source)
 
         time.sleep(1)
-        if self.units['light'] >= 15 or self.units['heavy'] >= 30 + hold_back['heavy']:
-            self.driver.set_farmassist_temp_kav(value_a, value_b)
+
+        light = self.acc_settings['farmassist_light']
+        axe = self.acc_settings['farmassist_axe']
+        marcher = self.acc_settings['farmassist_marcher']
+        heavy = self.acc_settings['farmassist_heavy']
+
+        if self.units['light'] >= light or self.units['heavy'] >= heavy + hold_back['heavy']:
+            self.driver.set_farmassist_temp_kav(value_a, value_b, light, heavy, self.game_data['units'])
             self.FA_temp_kav = True
             self.FA_temp_inf = False
             slowest_unit_a = 10
@@ -84,176 +81,184 @@ class AttackManager:
             time.sleep(1)
             print('Farming with Kavallarie')
             for tar in self.targets:
-                if self.units['light'] < 15:
+                if self.units['light'] < light:
                     break
                 target_entry = self.mongo.get_villages(self.targets[tar]['id'])
-                if target_entry:
-                    now = datetime.now()
-                    distance = self.get_dist(self.my_location, target_entry["location"])
-                    impact = datetime.timestamp(now + timedelta(minutes=slowest_unit_a * distance))
-                    if self.targets[tar]['Beute'] == 'Volle Beute' and self.targets[tar]['Sieg'] == 'Völliger Sieg':
-                        self.attack(target_entry, impact, distance, 'Volle Beute', 'a')
-                        self.units['light'] -= 15
+                if not target_entry:
+                    self.mongo.upload_villages(self.targets[tar])
+                    print(f'New Village found: {self.targets[tar]["id"]}')
+                    target_entry = self.mongo.get_villages(self.targets[tar]['id'])
+                now = datetime.now()
+                distance = self.get_dist(self.my_location, self.targets[tar]['coords'])
+                impact = datetime.timestamp(now + timedelta(minutes=slowest_unit_a * distance))
+                if self.targets[tar]['Beute'] == 'Volle Beute' and self.targets[tar]['Sieg'] == 'Völliger Sieg':
+                    self.attack(target_entry, impact, distance, 'Volle Beute', 'a')
+                    self.units['light'] -= light
+                    continue
+                if self.targets[tar]['Sieg'] == 'Verluste':
+                    print(f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because last attack yellow!")
+                    continue
+                if self.targets[tar]['Sieg'] == 'Lost':
+                    print(f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because last attack red!")
+                    continue
+                if self.targets[tar]['Sieg'] == 'Erspäht':
+                    if self.targets[tar]['Wall'] > 0:
+                        print(f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because wall lvl {self.targets[tar]['Wall']}!")
                         continue
-                    if self.targets[tar]['Sieg'] == 'Verluste':
-                        print(f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because last attack yellow!")
-                        continue
-                    if self.targets[tar]['Sieg'] == 'Lost':
-                        print(f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because last attack red!")
-                        continue
-                    if target_entry["last attack"]:
-                        passed = 0
-                        for attack in target_entry["last attack"]:
-                            diff = abs(impact - attack)
-                            if diff > (time_between_farm * 60):
-                                passed += 1
-                        if passed == len(target_entry["last attack"]):
-                            self.attack(target_entry, impact, distance, 'Normal Attack', 'a')
-                            self.units['light'] -= 15
-                        else:
-                            print(
-                                f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because timing between attacks")
-
-                # Refresh
-            self.driver.refresh()
-            for tar in self.targets:
-                if self.units['heavy'] < 30 + hold_back['heavy']:
-                    break
-                target_entry = self.mongo.get_villages(self.targets[tar]['id'])
-                if target_entry:
-                    now = datetime.now()
-                    distance = self.get_dist(self.my_location, target_entry["location"])
-                    impact = datetime.timestamp(now + timedelta(minutes=slowest_unit_b * distance))
-                    if self.targets[tar]['Beute'] == 'Volle Beute' and self.targets[tar]['Sieg'] == 'Völliger Sieg':
-                        self.attack(target_entry, impact, distance, 'Volle Beute', 'b')
-                        self.units['heavy'] -= 30
-                        continue
-                    if self.targets[tar]['Sieg'] == 'Verluste':
+                if target_entry["last attack"]:
+                    passed = 0
+                    for attack in target_entry["last attack"]:
+                        diff = abs(impact - attack)
+                        if diff > (time_between_farm * 60):
+                            passed += 1
+                    if passed == len(target_entry["last attack"]):
+                        self.attack(target_entry, impact, distance, 'Normal Attack', 'a')
+                        self.units['light'] -= light
+                    else:
                         print(
-                            f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because last attack yellow!")
-                        continue
-                    if self.targets[tar]['Sieg'] == 'Lost':
-                        print(
-                            f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because last attack red!")
-                        continue
-                    if target_entry["last attack"]:
-                        passed = 0
-                        for attack in target_entry["last attack"]:
-                            diff = abs(impact - attack)
-                            if diff > (time_between_farm * 60):
-                                passed += 1
-                        if passed == len(target_entry["last attack"]):
-                            self.attack(target_entry, impact, distance, 'Normal Attack', 'b')
-                            self.units['heavy'] -= 30
-                        else:
-                            print(
-                                f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because timing between attacks")
-
-        # Inf
-        time.sleep(1)
-        if self.units['axe'] >= 100 or self.units['spear'] >= 50 + hold_back['spear']:
-            self.driver.set_farmassist_temp_inf(value_a, value_b)
-            self.FA_temp_kav = False
-            self.FA_temp_inf = True
-            slowest_unit_a = 18
-            slowest_unit_b = 18
-            time.sleep(1)
-            print('Farming with Infanterie')
-            for tar in self.targets:
-                if self.units['spear'] < 50 + hold_back['spear']:
-                    break
-                target_entry = self.mongo.get_villages(self.targets[tar]['id'])
-                if target_entry:
-                    now = datetime.now()
-                    distance = self.get_dist(self.my_location, target_entry["location"])
-                    impact = datetime.timestamp(now + timedelta(minutes=slowest_unit_a * distance))
-                    if self.targets[tar]['Beute'] == 'Volle Beute' and self.targets[tar]['Sieg'] == 'Völliger Sieg':
-                        self.attack(target_entry, impact, distance, 'Volle Beute', 'a')
-                        self.units['spear'] -= 50
-                        continue
-                    if self.targets[tar]['Sieg'] == 'Verluste':
-                        print(
-                            f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because last attack yellow!")
-                        continue
-                    if self.targets[tar]['Sieg'] == 'Lost':
-                        print(
-                            f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because last attack red!")
-                        continue
-                    if target_entry["last attack"]:
-                        passed = 0
-                        for attack in target_entry["last attack"]:
-                            diff = abs(impact - attack)
-                            if diff > (time_between_farm * 60):
-                                passed += 1
-                        if passed == len(target_entry["last attack"]):
-                            self.attack(target_entry, impact, distance, 'Normal Attack', 'a')
-                            self.units['spear'] -= 50
-                        else:
-                            print(
-                                f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because timing between attacks")
+                            f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because timing between attacks")
 
             # Refresh
             self.driver.refresh()
             for tar in self.targets:
-                if self.units['axe'] < 100:
+                if self.units['heavy'] < heavy + hold_back['heavy']:
                     break
                 target_entry = self.mongo.get_villages(self.targets[tar]['id'])
-                if target_entry:
-                    now = datetime.now()
-                    distance = self.get_dist(self.my_location, target_entry["location"])
-                    impact = datetime.timestamp(now + timedelta(minutes=slowest_unit_b * distance))
-                    if self.targets[tar]['Beute'] == 'Volle Beute' and self.targets[tar]['Sieg'] == 'Völliger Sieg':
-                        self.attack(target_entry, impact, distance, 'Volle Beute', 'b')
-                        self.units['axe'] -= 100
+                if not target_entry:
+                    self.mongo.upload_villages(self.targets[tar])
+                    print(f'New Village found: {self.targets[tar]["id"]}')
+                    target_entry = self.mongo.get_villages(self.targets[tar]['id'])
+                now = datetime.now()
+                distance = self.get_dist(self.my_location, self.targets[tar]['coords'])
+                impact = datetime.timestamp(now + timedelta(minutes=slowest_unit_b * distance))
+                if self.targets[tar]['Beute'] == 'Volle Beute' and self.targets[tar]['Sieg'] == 'Völliger Sieg':
+                    self.attack(target_entry, impact, distance, 'Volle Beute', 'b')
+                    self.units['heavy'] -= heavy
+                    continue
+                if self.targets[tar]['Sieg'] == 'Verluste':
+                    print(
+                        f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because last attack yellow!")
+                    continue
+                if self.targets[tar]['Sieg'] == 'Lost':
+                    print(
+                        f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because last attack red!")
+                    continue
+                if self.targets[tar]['Sieg'] == 'Erspäht':
+                    if self.targets[tar]['Wall'] > 0:
+                        print(f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because wall lvl {self.targets[tar]['Wall']}!")
                         continue
-                    if self.targets[tar]['Sieg'] == 'Verluste':
+                if target_entry["last attack"]:
+                    passed = 0
+                    for attack in target_entry["last attack"]:
+                        diff = abs(impact - attack)
+                        if diff > (time_between_farm * 60):
+                            passed += 1
+                    if passed == len(target_entry["last attack"]):
+                        self.attack(target_entry, impact, distance, 'Normal Attack', 'b')
+                        self.units['heavy'] -= heavy
+                    else:
                         print(
-                            f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because last attack yellow!")
+                            f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because timing between attacks")
+
+        # Inf
+        time.sleep(1)
+        #
+        self.driver.check_captcha()
+
+        if self.units['axe'] >= axe + hold_back['axe'] or self.units['marcher'] >= marcher + hold_back['marcher']:
+            self.driver.set_farmassist_temp_inf(value_a, value_b, axe, marcher, self.game_data['units'])
+            self.FA_temp_kav = False
+            self.FA_temp_inf = True
+            slowest_unit_a = 10
+            slowest_unit_b = 18
+            time.sleep(1)
+            for tar in self.targets:
+                if self.units['marcher'] < marcher + hold_back['marcher']:
+                    break
+                target_entry = self.mongo.get_villages(self.targets[tar]['id'])
+                if not target_entry:
+                    self.mongo.upload_villages(self.targets[tar])
+                    print(f'New Village found: {self.targets[tar]["id"]}')
+                    target_entry = self.mongo.get_villages(self.targets[tar]['id'])
+                now = datetime.now()
+                distance = self.get_dist(self.my_location, self.targets[tar]['coords'])
+                impact = datetime.timestamp(now + timedelta(minutes=slowest_unit_a * distance))
+                if self.targets[tar]['Beute'] == 'Volle Beute' and self.targets[tar]['Sieg'] == 'Völliger Sieg':
+                    self.attack(target_entry, impact, distance, 'Volle Beute', 'a')
+                    self.units['marcher'] -= marcher
+                    continue
+                if self.targets[tar]['Sieg'] == 'Verluste':
+                    print(
+                        f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because last attack yellow!")
+                    continue
+                if self.targets[tar]['Sieg'] == 'Lost':
+                    print(
+                        f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because last attack red!")
+                    continue
+                if self.targets[tar]['Sieg'] == 'Erspäht':
+                    if self.targets[tar]['Wall'] > 0:
+                        print(f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because wall lvl {self.targets[tar]['Wall']}!")
                         continue
-                    if self.targets[tar]['Sieg'] == 'Lost':
+                if target_entry["last attack"]:
+                    passed = 0
+                    for attack in target_entry["last attack"]:
+                        diff = abs(impact - attack)
+                        if diff > (time_between_farm * 60):
+                            passed += 1
+                    if passed == len(target_entry["last attack"]):
+                        self.attack(target_entry, impact, distance, 'Normal Attack', 'a')
+                        self.units['marcher'] -= marcher
+                    else:
                         print(
-                            f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because last attack red!")
+                            f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because timing between attacks")
+
+            # Refresh
+            self.driver.refresh()
+            for tar in self.targets:
+                if self.units['axe'] < axe:
+                    break
+                target_entry = self.mongo.get_villages(self.targets[tar]['id'])
+                if not target_entry:
+                    self.mongo.upload_villages(self.targets[tar])
+                    print(f'New Village found: {self.targets[tar]["id"]}')
+                    target_entry = self.mongo.get_villages(self.targets[tar]['id'])
+                now = datetime.now()
+                distance = self.get_dist(self.my_location, self.targets[tar]['coords'])
+                impact = datetime.timestamp(now + timedelta(minutes=slowest_unit_b * distance))
+                if self.targets[tar]['Beute'] == 'Volle Beute' and self.targets[tar]['Sieg'] == 'Völliger Sieg':
+                    self.attack(target_entry, impact, distance, 'Volle Beute', 'b')
+                    self.units['axe'] -= axe
+                    continue
+                if self.targets[tar]['Sieg'] == 'Verluste':
+                    print(
+                        f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because last attack yellow!")
+                    continue
+                if self.targets[tar]['Sieg'] == 'Lost':
+                    print(
+                        f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because last attack red!")
+                    continue
+                if self.targets[tar]['Sieg'] == 'Erspäht':
+                    if self.targets[tar]['Wall'] > 0:
+                        print(f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because wall lvl {self.targets[tar]['Wall']}!")
                         continue
-                    if target_entry["last attack"]:
-                        passed = 0
-                        for attack in target_entry["last attack"]:
-                            diff = abs(impact - attack)
-                            if diff > (time_between_farm * 60):
-                                passed += 1
-                        if passed == len(target_entry["last attack"]):
-                            self.attack(target_entry, impact, distance, 'Normal Attack', 'b')
-                            self.units['axe'] -= 100
-                        else:
-                            print(
-                                f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because timing between attacks")
+                if target_entry["last attack"]:
+                    passed = 0
+                    for attack in target_entry["last attack"]:
+                        diff = abs(impact - attack)
+                        if diff > (time_between_farm * 60):
+                            passed += 1
+                    if passed == len(target_entry["last attack"]):
+                        self.attack(target_entry, impact, distance, 'Normal Attack', 'b')
+                        self.units['axe'] -= axe
+                    else:
+                        print(
+                            f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Not attacking because timing between attacks")
 
     def attack(self, target_entry, impact, distance, text, temp):
         print(
             f"Village [{target_entry['id']}] Distance: [{round(distance, 1)}] --> Attacking [{temp}] [{text}]")
         self.driver.hit_template(target_entry["id"], temp)
         self.mongo.upload_farm_attack_villages(target_entry["id"], impact)
-
-    def get_slowest_unit_a(self):
-        slowest_unit_a = 22
-        if self.acc_settings["FA_template_A"]["light"] > 0:
-            slowest_unit_a = 10
-        if self.acc_settings["FA_template_A"]["heavy"] > 0:
-            slowest_unit_a = 11
-        if self.acc_settings["FA_template_A"]["spear"] > 0 or \
-                self.acc_settings["FA_template_A"]["axe"] > 0:
-            slowest_unit_a = 18
-        return slowest_unit_a
-
-    def get_slowest_unit_b(self):
-        slowest_unit_b = 22
-        if self.acc_settings["FA_template_B"]["light"] > 0:
-            slowest_unit_b = 10
-        if self.acc_settings["FA_template_B"]["heavy"] > 0:
-            slowest_unit_b = 11
-        if self.acc_settings["FA_template_B"]["spear"] > 0 or \
-                self.acc_settings["FA_template_B"]["axe"] > 0:
-            slowest_unit_b = 18
-        return slowest_unit_b
 
 
     def should_farm(self):
@@ -266,7 +271,7 @@ class AttackManager:
     @staticmethod
     def get_dist(my_location, ext_loc):
         distance = math.sqrt(
-            ((my_location[0] - ext_loc[0]) ** 2)
-            + ((my_location[1] - ext_loc[1]) ** 2)
+            ((my_location[0] - int(ext_loc[0])) ** 2)
+            + ((my_location[1] - int(ext_loc[1])) ** 2)
         )
         return distance

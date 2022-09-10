@@ -207,28 +207,47 @@ class Extractor:
         text_fa = re.findall(r'(?s)Alle Berichte für dieses Dorf löschen(.+?)onclick="return Accountmanager.farm.sendUnits', tmp[0])
         village_id = re.findall(r'(?s)<tr id="village_(\d+)" class="report_', tmp[0])
 
+
+        first = '('
+        last = ')'
+        coords = re.findall(f'{first}\d\d\d[|]+\d\d\d{last}', tmp[0])
+
         sieg = []
+        wall = []
         beute = []
         for i in text_fa:
             if "Völliger Sieg" in i:
                 sieg.append('Völliger Sieg')
+                wall.append('?')
             if "Verluste" in i:
                 sieg.append('Verluste')
+                wall.append('?')
             if "Erspäht" in i:
                 sieg.append('Erspäht')
+                wall.append(int(re.findall(r'(?s)<td style="text-align: center;">(\d+)</td>\n\n', i)[0]))
+            if "Besiegt, aber Gebäude beschädigt" in i:
+                sieg.append('Besiegt')
+                wall.append('?')
+            if "Besiegt" in i:
+                sieg.append('Besiegt')
+                wall.append('?')
         for i in text_fa:
             if "Volle Beute" in i:
                 beute.append('Volle Beute')
-            if "Teilweise" in i:
+            if not "Volle Beute" in i:
                 beute.append('Teilweise Beute')
+
         targets = {}
         for i in range(len(village_id)):
             structure = {i+1: {
                 'id': village_id[i],
                 'Sieg': sieg[i],
                 'Beute': beute[i],
+                'coords': [coords[i].split('|')[0], coords[i].split('|')[1]],
+                'Wall': wall[i]
             }}
             targets.update(structure)
+
         return targets
 
     @staticmethod

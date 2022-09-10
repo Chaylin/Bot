@@ -3,9 +3,6 @@ from Game.building import Building
 from Game.gather import Gather
 from Game.recruit import Recruit
 
-from datetime import datetime
-from datetime import timedelta
-import time
 
 
 class Village:
@@ -25,6 +22,7 @@ class Village:
     next_time_gather = None
     next_time_farm = None
     next_time_recruit = None
+    start_time_gather = None
 
     vil_settings = None
     acc_settings = None
@@ -45,17 +43,15 @@ class Village:
 
 
     def get_started(self):
-        self.player = self.config.read_config("game", "account", "username")
-        self.world = self.config.read_config("game", "account", "world")
+        if not self.player:
+            self.player = self.config.read_config("game", "account", "username")
+        if not self.world:
+            self.world = self.config.read_config("game", "account", "world")
         self.driver.navigate_overview(self.world, self.v_id)
         source = self.driver.get_source()
         self.game_data = self.extractor.game_state(source)
-
-
         self.synch_account()
         self.vil_settings = self.synch_village(self.v_id)
-
-
 
     def build(self):
         if not bool(self.vil_settings["build"]):
@@ -87,6 +83,7 @@ class Village:
     def farm(self):
         if not bool(self.vil_settings["farm"]):
             self.next_time_farm = "Farming is set to false"
+            print(f'{self.v_id} Farm is set to False')
             return
         if not self.farming:
             self.farming = AttackManager(
@@ -119,7 +116,6 @@ class Village:
             "status": 'Online',
             "points": int(self.game_data["player"]["points"]),
             "villages": int(self.game_data["player"]["villages"]),
-            #"apm": round(self.apm),
         }
         player = "Vorlage Acc"
         template = self.mongo.get_player(player)
@@ -131,12 +127,13 @@ class Village:
             "gather": template[0]["gather"],
             "sleep": template[0]["sleep"],
             "apm_cap": template[0]["apm_cap"],
-            "night": template[0]["night"],
             "timeout_farm": template[0]["timeout_farm"],
             "timeout_scout": template[0]["timeout_scout"],
             "timeout_ram": template[0]["timeout_ram"],
-            "FA_template_A": template[0]["FA_template_A"],
-            "FA_template_B": template[0]["FA_template_B"],
+            "farmassist_light": template[0]['farmassist_light'],
+            "farmassist_heavy": template[0]['farmassist_heavy'],
+            "farmassist_axe": template[0]['farmassist_axe'],
+            "farmassist_marcher": template[0]['farmassist_marcher'],
         }
         self.acc_settings = self.mongo.synch_player(self.player, data, default_temp)
 

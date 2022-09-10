@@ -11,16 +11,24 @@ class ConfigStuff:
         self.game_path = pathlib.Path(__file__).parent.absolute().joinpath("ConfigFiles\game.ini")
         self.farm_path = pathlib.Path(__file__).parent.absolute().joinpath("ConfigFiles\farm.ini")
         self.cache_path = pathlib.Path(__file__).parent.absolute().joinpath("Cache")
+        self.path_notify = pathlib.Path(__file__).parent.absolute().joinpath("ConfigFiles\data.txt")
+
+
+    def notification(self, msg):
+        data_string = json.dumps(msg)
+        with open(self.path_notify, "w") as f:
+            f.write(data_string)
+
 
     def read_config(self, config, section, search):
-        path = None
-        if config == "game":
-            path = self.game_path
-        if config == "farm":
-            path = self.farm_path
-        self.config.read(path)
-        result = self.config[section][search]
-        return result
+            path = None
+            if config == "game":
+                path = self.game_path
+            if config == "farm":
+                path = self.farm_path
+            self.config.read(path)
+            result = self.config[section][search]
+            return result
 
     def read_config_bool(self, config, section, search):
         path = None

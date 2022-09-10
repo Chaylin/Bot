@@ -118,6 +118,8 @@ class Building:
         return sum_time
 
     def check_some_stuff(self, game_data, building_data, next_building, queue_count):
+        if not next_building:
+            return
         building = next_building.split(":")
         cost_wood = building_data[building[0]]["wood"]
         cost_stone = building_data[building[0]]["stone"]
@@ -164,7 +166,8 @@ class Building:
 
     def get_next_building(self, list_buildings, village_name):
         next_building = None
-        for x in self.vil_settings["buildorder"]:
+        # for x in self.vil_settings["buildorder"]:
+        for x in self.config.get_list('buildorder'):
             for y in list_buildings:
                 if str(x) == str(y):
                     next_building = x

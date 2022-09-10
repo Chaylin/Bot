@@ -1,24 +1,38 @@
 import pymongo
 from datetime import datetime
-from datetime import date
+from Game.config import ConfigStuff
+import certifi
+import dns.resolver
+
+
+dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
+dns.resolver.default_resolver.nameservers = ['8.8.8.8']
 
 
 class Mongo:
-    logs = {}
+    config = None
+    world = None
+
 
     def __init__(self):
+        ca = certifi.where()
+        if not self.config:
+            self.config = ConfigStuff()
+        if not self.world:
+            self.world = self.config.read_config('game', 'account', 'world')
         self.client = pymongo.MongoClient(
-            "mongodb+srv://admin:admin@cluster0.kxi86.mongodb.net/Database?retryWrites=true&w=majority")
+            "mongodb+srv://admin:admin@cluster0.kxi86.mongodb.net/Database?retryWrites=true&w=majority", tlsCAFILE=ca)
         self.db = self.client.tribalwars
-        self.player = self.db.player
-        self.own_villages = self.db.own_villages
-        self.villages = self.db.villages202
-        self.dblogs = self.db.logs
+        self.player = self.db[f'player{self.world}']
+        self.own_villages = self.db[f'own_villages{self.world}']
+        self.villages = self.db[f'villages{self.world}']
+
 
     def find_by_coords(self, x, y):
         query = {"location": [int(x), int(y)]}
         result = self.villages.find_one(query)
         return result
+
 
     def get_player(self, player):
         find = {"player": player}
@@ -61,30 +75,14 @@ class Mongo:
             }
             update = {"$set": structure}
             self.own_villages.update_one(query, update)
+            if result['buildorder'] != default_temp['buildorder']:
+                update = {"$set": {'buildorder': default_temp['buildorder']}}
+                self.own_villages.update_one(query, update)
             return result
         else:
             data.update(default_temp)
             self.own_villages.insert_one(data)
             return default_temp
-
-    def create_daily_log(self, player, default_log_acc):
-        query = {'query': f'{player} {date.today()}'}
-        result = self.dblogs.find_one(query)
-        if result:
-            return result
-        else:
-            self.dblogs.insert_one(default_log_acc)
-
-    def synch_log(self, data, player):
-        query = {'query': f'{player} {date.today()}'}
-        result = self.dblogs.find_one(query)
-        if result:
-            update = {'$set': data}
-            self.dblogs.update_one(query, update)
-        else:
-            self.create_daily_log(player)
-            update = {'$set': data}
-            self.dblogs.update_one(query, update)
 
 
     def delete_attack(self, command_id):
@@ -158,20 +156,14 @@ class Mongo:
             update = {"$set": structure}
             self.villages.update_one(village, update)
 
-    def upload_villages(self, v_id,  data):           # upload_mongo_villages
-        village = {'id': v_id}
-        update = {"$set": {
-            "name": data["name"],
-            "points": data["points"],
-            "tribe": data["tribe"],
-            "owner": data["owner"],
-            }
-            }
-        result = self.villages.find_one(village)
-        if result:
-            self.villages.update_one(village, update)
-        else:
-            self.villages.insert_one(data)
+    def upload_villages(self, data):           # upload_mongo_villages
+        structure = {
+            'id': data['id'],
+            'coords': data['coords'],
+            'last attack': [1],
+            'last ram': 1
+        }
+        self.villages.insert_one(structure)
 
     def upload_spy_attack_villages(self, v_id, impact):
         village = {'id': v_id}

@@ -2,7 +2,7 @@ import datetime
 from datetime import datetime
 from datetime import timedelta
 import time
-
+import pathlib
 import re
 import math
 import random
@@ -12,8 +12,9 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException
 from selenium.common.exceptions import ElementNotInteractableException
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.chrome.options import Options
 
-from twocaptcha import TwoCaptcha
 
 
 class Driver:
@@ -23,19 +24,23 @@ class Driver:
     FA_temp_kav = False
     FA_temp_inf = False
 
-    def __init__(self, driver_path=None):
-        self.driver_path = driver_path
-        self.driver = webdriver.Chrome(self.driver_path)
+
+
+    def __init__(self):
+        self.ext_path = pathlib.Path(__file__).parent.absolute().joinpath("AntiCaptcha")
+        self.options = Options()
+        self.options.add_argument(f'--load-extension={self.ext_path}')
+        self.driver_path = pathlib.Path(__file__).parent.absolute().joinpath("Driver/chromedriver.exe")
+        self.driver = webdriver.Chrome(self.driver_path, chrome_options=self.options)
         self.driver.maximize_window()
         self.driver.implicitly_wait(30)
 
 
-    def check_bot_captcha(self):
-        if self.driver.find_element(By.ID, "bot_check"):
-            return True
-
-        else:
-            return False
+    def check_captcha(self):
+        source = self.get_source()
+        if 'data-bot-protect="forced"' in source:
+            print('Bot-Captcha active')
+            time.sleep(60)
 
     def refresh(self):
         self.actions += 1
@@ -57,7 +62,8 @@ class Driver:
         input_pw = self.driver.find_element(By.ID, "password")
         input_pw.send_keys(pw)
         input_pw.submit()
-        time.sleep(5)
+
+
 
         WebDriverWait(self.driver, 120).until(
             EC.presence_of_element_located((By.CLASS_NAME, "world-select"))
@@ -212,6 +218,11 @@ class Driver:
         self.driver.get(url)
         self.actions += 1
 
+    def navigate_mass_gathering(self, v_id, world, page):
+        url = f"https://de{world}.die-staemme.de/game.php?village={v_id}&screen=place&mode=scavenge_mass&page={page}"
+        self.driver.get(url)
+        self.actions += 1
+
     def navigate_login(self):
         url = "https://www.die-staemme.de/"
         self.driver.get(url)
@@ -311,8 +322,37 @@ class Driver:
         self.driver.refresh()
         self.actions += 1
 
+    def mass_gathering(self, v_id, world, village_count):
+        page_count = math.ceil(village_count / 50)
+        i = 0
+        while True:
+            # Input Spear
+            input_spear = self.driver.find_element(By.NAME, 'spear')
+            print('Gathering all villages with 500 spear 4times (all) ')
+            input_spear.send_keys(500)
+            time.sleep(random.randint(1, 2))
+
+            # Check all columns
+            self.driver.execute_script("document.getElementsByClassName('select-all-col')[4].click()")
+            time.sleep(random.randint(1, 2))
+
+            # Send Button
+            self.driver.execute_script("document.getElementsByClassName('btn btn-default btn-send')[0].click()")
+            time.sleep(random.randint(1, 2))
+
+            # Switch Page
+            i += 1
+            if i == page_count:
+                print('break')
+                break
+            self.navigate_mass_gathering(v_id, world, i)
+
     def get_gather_time(self):
+        time.sleep(1)
+        self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        time.sleep(1)
         gather_time = []
+        gather_time.clear()
         elements = self.driver.find_elements(By.CLASS_NAME, "return-countdown")
         for element in elements:
             (h, m, s) = element.get_attribute("innerText").split(":")
@@ -385,7 +425,7 @@ class Driver:
     def get_FA_IDs(self, source):
         pass
 
-    def set_farmassist_temp_kav(self, value_a, value_b):
+    def set_farmassist_temp_kav(self, value_a, value_b, light, heavy, units):
         if self.FA_temp_kav:
             return
         # Change template A
@@ -398,9 +438,16 @@ class Driver:
         self.driver.find_element(By.NAME, f"spy{value_a}").clear()
         self.driver.find_element(By.NAME, f"spy{value_a}").send_keys(0)
         self.driver.find_element(By.NAME, f"light{value_a}").clear()
-        self.driver.find_element(By.NAME, f"light{value_a}").send_keys(15)
+        self.driver.find_element(By.NAME, f"light{value_a}").send_keys(light)
         self.driver.find_element(By.NAME, f"heavy{value_a}").clear()
         self.driver.find_element(By.NAME, f"heavy{value_a}").send_keys(0)
+        if 'archer' in units:
+            self.driver.find_element(By.NAME, f"archer{value_a}").clear()
+            self.driver.find_element(By.NAME, f"archer{value_a}").send_keys(0)
+        if 'marcher' in units:
+            self.driver.find_element(By.NAME, f"marcher{value_a}").clear()
+            self.driver.find_element(By.NAME, f"marcher{value_a}").send_keys(0)
+
 
         # Change template B
         self.driver.find_element(By.NAME, f"spear{value_b}").clear()
@@ -414,7 +461,13 @@ class Driver:
         self.driver.find_element(By.NAME, f"light{value_b}").clear()
         self.driver.find_element(By.NAME, f"light{value_b}").send_keys(0)
         self.driver.find_element(By.NAME, f"heavy{value_b}").clear()
-        self.driver.find_element(By.NAME, f"heavy{value_b}").send_keys(25)
+        self.driver.find_element(By.NAME, f"heavy{value_b}").send_keys(heavy)
+        if 'archer' in units:
+            self.driver.find_element(By.NAME, f"archer{value_b}").clear()
+            self.driver.find_element(By.NAME, f"archer{value_b}").send_keys(0)
+        if 'marcher' in units:
+            self.driver.find_element(By.NAME, f"marcher{value_b}").clear()
+            self.driver.find_element(By.NAME, f"marcher{value_b}").send_keys(0)
 
         time.sleep(1)
         self.driver.execute_script("document.getElementsByClassName('btn')[0].click()")
@@ -422,12 +475,12 @@ class Driver:
         self.FA_temp_kav = True
         self.FA_temp_inf = False
 
-    def set_farmassist_temp_inf(self, value_a, value_b):
+    def set_farmassist_temp_inf(self, value_a, value_b, axe, marcher, units):
         if self.FA_temp_inf:
             return
         # Change template A
         self.driver.find_element(By.NAME, f"spear{value_a}").clear()
-        self.driver.find_element(By.NAME, f"spear{value_a}").send_keys(50)
+        self.driver.find_element(By.NAME, f"spear{value_a}").send_keys(0)
         self.driver.find_element(By.NAME, f"sword{value_a}").clear()
         self.driver.find_element(By.NAME, f"sword{value_a}").send_keys(0)
         self.driver.find_element(By.NAME, f"axe{value_a}").clear()
@@ -438,6 +491,12 @@ class Driver:
         self.driver.find_element(By.NAME, f"light{value_a}").send_keys(0)
         self.driver.find_element(By.NAME, f"heavy{value_a}").clear()
         self.driver.find_element(By.NAME, f"heavy{value_a}").send_keys(0)
+        if 'archer' in units:
+            self.driver.find_element(By.NAME, f"archer{value_a}").clear()
+            self.driver.find_element(By.NAME, f"archer{value_a}").send_keys(0)
+        if 'marcher' in units:
+            self.driver.find_element(By.NAME, f"marcher{value_a}").clear()
+            self.driver.find_element(By.NAME, f"marcher{value_a}").send_keys(marcher)
 
         # Change template B
         self.driver.find_element(By.NAME, f"spear{value_b}").clear()
@@ -445,13 +504,19 @@ class Driver:
         self.driver.find_element(By.NAME, f"sword{value_b}").clear()
         self.driver.find_element(By.NAME, f"sword{value_b}").send_keys(0)
         self.driver.find_element(By.NAME, f"axe{value_b}").clear()
-        self.driver.find_element(By.NAME, f"axe{value_b}").send_keys(100)
+        self.driver.find_element(By.NAME, f"axe{value_b}").send_keys(axe)
         self.driver.find_element(By.NAME, f"spy{value_b}").clear()
         self.driver.find_element(By.NAME, f"spy{value_b}").send_keys(0)
         self.driver.find_element(By.NAME, f"light{value_b}").clear()
         self.driver.find_element(By.NAME, f"light{value_b}").send_keys(0)
         self.driver.find_element(By.NAME, f"heavy{value_b}").clear()
         self.driver.find_element(By.NAME, f"heavy{value_b}").send_keys(0)
+        if 'archer' in units:
+            self.driver.find_element(By.NAME, f"archer{value_b}").clear()
+            self.driver.find_element(By.NAME, f"archer{value_b}").send_keys(0)
+        if 'marcher' in units:
+            self.driver.find_element(By.NAME, f"marcher{value_b}").clear()
+            self.driver.find_element(By.NAME, f"marcher{value_b}").send_keys(0)
 
         time.sleep(1)
         self.driver.execute_script("document.getElementsByClassName('btn')[0].click()")
